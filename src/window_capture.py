@@ -4,41 +4,14 @@ from typing import Tuple
 import win32gui
 import win32ui
 import ctypes
-from ctypes import windll, wintypes
+from ctypes import windll
 
 
-class WINDOWPLACEMENT(ctypes.Structure):
-    _fields_ = [
-        ("length", wintypes.UINT),
-        ("flags", wintypes.UINT),
-        ("showCmd", wintypes.INT),
-        ("ptMinPosition", wintypes.POINT),
-        ("ptMaxPosition", wintypes.POINT),
-        ("rcNormalPosition", wintypes.RECT),
-    ]
-    
 class ScreenCapture():
     def __init__(self):
         self.user32 = ctypes.WinDLL('user32')
         self.rect = ctypes.wintypes.RECT()
         
-
-    def window_state(self, hWnd: int) -> int:
-        placement = WINDOWPLACEMENT()
-        placement.length = ctypes.sizeof(WINDOWPLACEMENT)
-
-        if self.user32.GetWindowPlacement(hWnd, ctypes.byref(placement)):
-            if placement.showCmd == 3: # 3 == SW_SHOWMAXIMIZED (Fullscreen)
-                return placement.showCmd
-            elif placement.showCmd == 1: # 1 == SW_SHOWNORMAL (Window)
-                return placement.showCmd
-            elif placement.showCmd == 2: # 2 == SW_SHOWMINIMIZED (Minimize)
-                raise Exception("Window is Minimized")
-            else:
-                raise Exception("Unknown window state")
-        else:
-            raise Exception("Error while retrieving window location information")
-
 
     def active_window_hwnd(self) -> int:
         hwnd = self.user32.GetForegroundWindow()
