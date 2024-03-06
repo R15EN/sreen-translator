@@ -1,7 +1,8 @@
 from PyQt5.QtCore import Qt, QThread, QSemaphore, pyqtSignal 
 from PyQt5.QtGui import QPixmap, QImage, QFont
-from PyQt5.QtWidgets import QLabel, QWidget, QSizePolicy
+from PyQt5.QtWidgets import QLabel, QWidget
 import numpy as np
+import re
 from typing import Tuple
 from src.window_capture import ScreenCapture
 
@@ -38,7 +39,7 @@ class SubwindowThread(QThread):
                     self.update_signal.emit(lines, inpainted, mask)
                     self.semaphore.release()  # Разблокируем семафор после отправки сигнала
             except Exception as e:
-                print(e)
+                print(e.with_traceback())
     
     
     def stop(self) -> None:
@@ -145,25 +146,38 @@ class BaseSubtitleWindow(QWidget):
             label.deleteLater()
         self.labels = []
         
-        
-    def create_label(self, text: str, parent = None) -> QLabel:
-        label = QLabel(text, parent)
-        label.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
-        return label
     
+    def set_label_stretch(self, label: QLabel, font: QFont):
+        '''
+        Calculates and sets the font stretch for a QLabel 
+        so that text does not extend beyond the boundaries of the QLabel.
+        (Doesn't always work correctly)
+        '''
+        def label_width():
+            return label.fontMetrics().boundingRect(label.text()).width()
+        
+        stretch = 100
+        min_stretch = 70
+        extra_width = 20 # Extra width because width calculation is incorrect
+        while label_width() + extra_width > label.width() and stretch >= min_stretch:
+            stretch -= 1
+            font.setStretch(stretch)
+            label.setFont(font)
+
     
     def update_label(self, label: QLabel, text_info: tuple) -> None:
         text, y, h, x, w = text_info
         font = self.base_font
         font.setPixelSize(h)
-
+        font.setStretch(100)
+        
         label.move(x, y)
         label.setText(text)
         label.setFont(font)
-        label.setMinimumWidth(w)     
+        label.setFixedWidth(w)
         label.setMinimumHeight(h)
         label.setStyleSheet(self.text_style)
-        # label.setWordWrap(True)
+        self.set_label_stretch(label, font)        
 
     
     def update_image(self, *args):
@@ -171,9 +185,12 @@ class BaseSubtitleWindow(QWidget):
     
     
     def translate_text(self, text_list: list) -> None:
-        tmp_text = '[0]'.join(text_list)
+        pattern = r'\s*#\s*\$\s*#\s*'
+        unstrans_elem = '#$#' # #$# - untranslatable element
+        tmp_text = unstrans_elem.join(text_list)
         tmp_text = self.translator.translate(tmp_text)
-        tmp_text = tmp_text.split('[0]')
+        tmp_text = re.sub(pattern, unstrans_elem, tmp_text)
+        tmp_text = tmp_text.split(unstrans_elem)
         return tmp_text
     
     
@@ -183,14 +200,14 @@ class BaseSubtitleWindow(QWidget):
         if self.translate:
             try:
                 text_data = [
-                    (t, y, h, x, w) for t, (_, y, h, x, w) in 
+                    (t.strip(), y, h, x, w) for t, (_, y, h, x, w) in 
                     zip(self.translate_text([k[0] for k in text_data]), text_data)
                 ]  
             except AttributeError as e:
                 print(e)
                 return
         for text_info in text_data:
-            label = self.create_label('', self)
+            label = QLabel(self)
             self.update_label(label, text_info)
             self.labels.append(label)
             label.show()
