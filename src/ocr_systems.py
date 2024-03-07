@@ -7,15 +7,8 @@ from config.config import PYTESSERACT_PATH
 pytesseract.pytesseract.tesseract_cmd = PYTESSERACT_PATH
 
 
-class BaseOCR():
-    def __init__(self):
-        pass
-    
-    def ocr_process_image(self, image, inpaint: bool):
-        pass
-    
-    
-class TesseractOCR(BaseOCR):
+
+class TesseractOCR():
     
     languages = {
         'english': 'eng',
@@ -59,8 +52,8 @@ class TesseractOCR(BaseOCR):
         return np.array(image)
 
     
-    def ocr_process_image(self, image, inpaint=False):
-    
+    def ocr_process_image(self, image: np.ndarray, inpaint: bool = False) -> tuple[np.ndarray, np.ndarray, list]:
+        
         if not isinstance(image, np.ndarray):
             image = np.array(image, dtype=np.uint8)
         if inpaint:
@@ -91,7 +84,7 @@ class TesseractOCR(BaseOCR):
             text = text.replace('|', 'I') # small correction
             
             if inpaint:
-                mask[max(y-2, 0):y+h+2, max(x-2, 0):x+w+2] = 255        
+                mask[max(y-4, 0):y+h+4, max(x-4, 0):x+w+4] = 255        
             
             if (prev_line, prev_block, prev_par) == (line, block, par):
                 full_text += text + ' '
@@ -99,12 +92,13 @@ class TesseractOCR(BaseOCR):
             else:
                 prev_line, prev_block, prev_par = line, block, par
                 if len(word_sizes):
-                    lines.append((full_text, *self.get_line_size(word_sizes)))
+                    lines.append((full_text.rstrip(), *self.get_line_size(word_sizes)))
                 full_text = text + ' '
                 word_sizes = [(y, y+h, x, x+w)]
-
-        lines.append((full_text, *self.get_line_size(word_sizes)))
-        lines = list(filter(lambda line: all(line), lines))
+    
+        lines.append((full_text.rstrip(), *self.get_line_size(word_sizes)))
+        lines = list(filter(lambda line: all((line[0], line[2], line[4])), lines))
+        
         if inpaint:
             inpainted_image = np.array(
                 cv2.inpaint(image, mask, 5, cv2.INPAINT_TELEA), dtype=np.uint8
@@ -114,7 +108,7 @@ class TesseractOCR(BaseOCR):
         return (np.empty(shape = (0,)), np.empty(shape = (0,)), lines)
 
 
-class EasyOCR(BaseOCR):
+class EasyOCR():
     
     languages = {
         'english': ['en'],
@@ -143,10 +137,10 @@ class EasyOCR(BaseOCR):
 
     
     def detect_and_recognize(self, image: np.ndarray) -> list:
-        return self.reader.readtext(image, detail=1, width_ths=1, add_margin=0, min_size=5)
+        return self.reader.readtext(image, detail=1, width_ths=1, add_margin=0, min_size=2)
     
 
-    def ocr_process_image(self, image, inpaint: bool):
+    def ocr_process_image(self, image: np.ndarray, inpaint: bool = False) -> tuple[np.ndarray, np.ndarray, list]:
         
         def split_by_space(data_list: list, splitted_data: list, flag: bool = False):
             for i, value in enumerate(data_list[1:], start=1):
@@ -165,7 +159,7 @@ class EasyOCR(BaseOCR):
             return True
 
         def correct_text(text):
-            replacement_pairs = (('_', ' '), ("$", "s"), ('|', 'I'), ('@', 'a'))
+            replacement_pairs = (('_', ' '), ("$", "s"), ('|', 'I'), ('@', 'a'), ('[', 'I'))
             for pair in replacement_pairs:
                 text = text.replace(*pair)
             return text
@@ -195,7 +189,10 @@ class EasyOCR(BaseOCR):
             data_dict['height'] = data_dict['bottom'] - data_dict['top']
             data_dict['width'] = data_dict['right'] - data_dict['left']
             data_dict['mean_line'] = (data_dict['top'] + data_dict['bottom']) // 2
-            data_dict['mean_char_width'] = data_dict['width'] / len(data_dict['text'])
+            if len(data_dict['text']):
+                data_dict['mean_char_width'] = data_dict['width'] / len(data_dict['text'])
+            else:
+                data_dict['mean_char_width'] = 0
             ocr_data.append(data_dict)
             
             if inpaint:
@@ -203,8 +200,7 @@ class EasyOCR(BaseOCR):
                     max(data_dict['top']-2, 0):data_dict['bottom']+2, 
                     max(data_dict['left']-2, 0):data_dict['right']+2
                 ] = 255             
-                
-                
+        
         # combining and dividing data into groups, depending on their position
         splitted_data = [] 
         data_group_by_mean_lines = {}
@@ -308,10 +304,3 @@ class EasyOCR(BaseOCR):
         else:
             return (np.empty(shape = (0,)), np.empty(shape = (0,)), lines)
         
-            
-class TesseractEasyOCR(TesseractOCR):
-    '''
-    In the future, this class will use detection from EasyOCR and recognition from Tesseeract (or vice versa).
-    '''
-    def __init__(self):
-        pass
