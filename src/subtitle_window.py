@@ -1,10 +1,13 @@
-from PyQt5.QtCore import Qt, QThread, QSemaphore, pyqtSignal 
+from PyQt5.QtCore import Qt, QThread, pyqtSignal, QEventLoop
 from PyQt5.QtGui import QPixmap, QImage, QFont
 from PyQt5.QtWidgets import QLabel, QWidget
+from typing import Tuple
+from thefuzz import fuzz
 import numpy as np
 import re
-from typing import Tuple
+
 from src.window_capture import ScreenCapture
+
 
 class SubwindowThread(QThread):
     
@@ -19,10 +22,10 @@ class SubwindowThread(QThread):
         self.coordinates = None
         self.screen_rect = None
         self.is_running = True
-        self.semaphore = QSemaphore(1)
         
 
     def run(self):
+        self.loop = QEventLoop() 
         while self.is_running:
             try:
                 active_window_hwnd = self.sct.active_window_hwnd()
@@ -35,11 +38,10 @@ class SubwindowThread(QThread):
                     inpainted, mask, lines = self.ocr_system.ocr_process_image(
                         img, inpaint=self.inpaint
                     )
-                    self.semaphore.acquire()  # Блокируем семафор перед отправкой сигнала
                     self.update_signal.emit(lines, inpainted, mask)
-                    self.semaphore.release()  # Разблокируем семафор после отправки сигнала
+                    self.loop.exec_()  
             except Exception as e:
-                print(e.with_traceback())
+                print(e)
     
     
     def stop(self) -> None:
@@ -113,8 +115,11 @@ class BaseSubtitleWindow(QWidget):
         self.work_thread.set_screen_rect(self.screen_rect)
         self.work_thread.update_signal.connect(self.update)
         self.start_thread()
-        self.semaphore = self.work_thread.semaphore
-    
+        
+        self.cached_text = ''
+        self.cached_translated_text = ''
+        self.cached_text_data = None
+        
         
     def initUI(self) -> None:        
         pass
@@ -125,7 +130,7 @@ class BaseSubtitleWindow(QWidget):
         self.work_thread.stop()
         self.work_thread.quit()
         self.work_thread.wait()
-        
+
     
     def start_thread(self) -> None:
         self.work_thread.start()
@@ -144,7 +149,7 @@ class BaseSubtitleWindow(QWidget):
     def remove_labels(self) -> None:
         for label in self.labels:
             label.deleteLater()
-        self.labels = []
+        self.labels.clear()
         
     
     def set_label_stretch(self, label: QLabel, font: QFont):
@@ -170,7 +175,7 @@ class BaseSubtitleWindow(QWidget):
         font = self.base_font
         font.setPixelSize(h)
         font.setStretch(100)
-        
+    
         label.move(x, y)
         label.setText(text)
         label.setFont(font)
@@ -180,32 +185,51 @@ class BaseSubtitleWindow(QWidget):
         self.set_label_stretch(label, font)        
 
     
-    def update_image(self, *args):
+    def update_image(self, image: np.ndarray, mask: np.ndarray) -> None:
+        '''
+        A method that performs some actions with the image and mask arguments.
+
+        This method can be overridden in child classes if its behavior 
+        needs to be changed or extended. In the base class the method is implemented 
+        as empty, because one of the child classes does not need it.
+        '''
         pass
     
     
-    def translate_text(self, text_list: list) -> None:
+    def translate_list_of_texts(self, text_list: list) -> list:
         pattern = r'\s*#\s*\$\s*#\s*'
         unstrans_elem = '#$#' # #$# - untranslatable element
         tmp_text = unstrans_elem.join(text_list)
-        tmp_text = self.translator.translate(tmp_text)
-        tmp_text = re.sub(pattern, unstrans_elem, tmp_text)
+        if tmp_text:
+            tmp_text = self.translator.translate(tmp_text)
+        tmp_text = re.sub(pattern, unstrans_elem, str(tmp_text))
         tmp_text = tmp_text.split(unstrans_elem)
         return tmp_text
-    
+
     
     def update_text(self, text_data: list) -> None:
-        if self.labels:
-            self.remove_labels()
         if self.translate:
-            try:
-                text_data = [
-                    (t.strip(), y, h, x, w) for t, (_, y, h, x, w) in 
-                    zip(self.translate_text([k[0] for k in text_data]), text_data)
-                ]  
-            except AttributeError as e:
-                print(e)
+            text_list = [d[0] for d in text_data]
+            text = ' '.join(text_list)
+            ratio = fuzz.ratio(text, self.cached_text) # It uses Levenstein Distance
+            if ratio >= 95 and self.cached_text:
+                text_data = self.cached_text_data
+            elif text:
+                translated_text = self.translate_list_of_texts(text_list)
+                text_data = [(text.strip(), *coords) for text, (_, *coords) in zip(translated_text, text_data)]
+                self.cached_translated_text = translated_text
+                if text_data is None:
+                    return 
+                self.cached_text = text
+                self.cached_text_data = text_data
+                self.remove_labels()
+                self.create_labels(text_data)
+            else:
+                self.remove_labels()    
                 return
+
+        
+    def create_labels(self, text_data):
         for text_info in text_data:
             label = QLabel(self)
             self.update_label(label, text_info)
@@ -213,12 +237,13 @@ class BaseSubtitleWindow(QWidget):
             label.show()
             
     
-    def update(self, text_data: list, image: np.ndarray = None, mask: np.ndarray = None) -> None:
-        self.semaphore.release()  
-        if image is not None and mask is not None: 
-            self.update_image(image, mask)
-        self.update_text(text_data)
-        self.semaphore.acquire()  
+    def update(self, text_data: list = None, image: np.ndarray = None, mask: np.ndarray = None) -> None:
+        if image is not None and mask is not None:
+            if len(image) > 0 and len(mask) > 0:
+                self.update_image(image, mask)
+        if text_data is not None:
+            self.update_text(text_data)
+        self.work_thread.loop.quit()
 
     
                 
