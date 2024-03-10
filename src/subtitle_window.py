@@ -118,7 +118,6 @@ class BaseSubtitleWindow(QWidget):
         
         self.cached_text = ''
         self.cached_translated_text = ''
-        self.cached_text_data = None
         
         
     def initUI(self) -> None:        
@@ -212,21 +211,21 @@ class BaseSubtitleWindow(QWidget):
             text_list = [d[0] for d in text_data]
             text = ' '.join(text_list)
             ratio = fuzz.ratio(text, self.cached_text) # It uses Levenstein Distance
-            if ratio >= 95 and self.cached_text:
-                text_data = self.cached_text_data
+            if ratio >= 95 and self.cached_text and text:
+                return
             elif text:
                 translated_text = self.translate_list_of_texts(text_list)
                 text_data = [(text.strip(), *coords) for text, (_, *coords) in zip(translated_text, text_data)]
-                self.cached_translated_text = translated_text
                 if text_data is None:
                     return 
                 self.cached_text = text
-                self.cached_text_data = text_data
+                self.cached_translated_text = translated_text
                 self.remove_labels()
                 self.create_labels(text_data)
             else:
+                self.cached_text = ''
+                self.cached_translated_text = ''
                 self.remove_labels()    
-                return
 
         
     def create_labels(self, text_data):
