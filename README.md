@@ -18,7 +18,7 @@ It is a screen translation app with an intuitive interface that acts as an overl
 4. The image is sent for preprocessing (if required) for subsequent submission to the OCR system.
 5. The recognized text is grouped into lines and translated.
 6. Translated strings are displayed in the same places where the original strings were.
-7. The area with the original text is painted over using computer vision methods.
+7. Using computer vision methods, an image is created that overlaps the text.
 
 ![alt-text](docs/preview.gif)
 ![alt-text](docs/preview2.gif)
@@ -49,15 +49,15 @@ The project is in the early stages of development and requires optimization and 
 
 Here are some known issues and plans for future development:
 
-1. **Ineffective translation work.** The text in the image is recognized quite often, and a translation request is sent every time, even if the text does not change.
+1. ~~**Ineffective translation work.** The text in the image is recognized quite often, and a translation request is sent every time, even if the text does not change.~~
 
-> **Potential Solution:**
-> Compare detected text with previous detections. Possibly using Levenshtein distance. In case of major changes, perform a new translation.
+> ~~**Potential Solution:**
+> Compare detected text with previous detections. Possibly using Levenshtein distance. In case of major changes, perform a new translation~~.
 
-2. **Poor implementation of composing rows from detected text** in the EasyOCR class. Also text at the same height is concatenated into one row, even if it is far away.
+2. ~~**Poor implementation of composing rows from detected text** in the EasyOCR class. Also text at the same height is concatenated into one row, even if it is far away.~~
 
-> **Potential Solution:**
-> Rewrite the algorithm.
+> ~~**Potential Solution:**
+> Rewrite the algorithm.~~
 
 3. **There are many false positives when running Tesseract.**
 
@@ -67,14 +67,12 @@ Here are some known issues and plans for future development:
 4. **Incorrect definition of height for rows with text.**
 
 > **Potential Solutions:**
->
-> - **Option 1:** Comparison with nearby rows, averaging sizes
-> - **Option 2:** Divide text into blocks, and set the same size (mean or median) for blocks.
+> Divide text into blocks, and set the same size (mean or median) for blocks.
 
 5. **Translated text does not fit within the selection frame.**
 
 > **Potential Solution:**
-> I don't know. Possible solutions create other problems.
+> Reduce the width of characters and the space between them in lines that do not fit
 
 6. **Only Google Translate works.**
 
