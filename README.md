@@ -49,16 +49,8 @@ The project is in the early stages of development and requires optimization and 
 
 Here are some known issues and plans for future development:
 
-1. ~~**Ineffective translation work.** The text in the image is recognized quite often, and a translation request is sent every time, even if the text does not change.~~
-
-> ~~**Potential Solution:**
-> Compare detected text with previous detections. Possibly using Levenshtein distance. In case of major changes, perform a new translation~~.
-
-2. ~~**Poor implementation of composing rows from detected text** in the EasyOCR class. Also text at the same height is concatenated into one row, even if it is far away.~~
-
-> ~~**Potential Solution:**
-> Rewrite the algorithm.~~
-
+1. **~~Ineffective translation work.~~**
+2. **~~Poor implementation of composing rows from detected text~~**
 3. **There are many false positives when running Tesseract.**
 
 > **Potential Solution:**
@@ -74,11 +66,8 @@ Here are some known issues and plans for future development:
 > **Potential Solution:**
 > Reduce the width of characters and the space between them in lines that do not fit
 
-6. **Only Google Translate works.**
-
-> **Potential Solution:**
-> Refusal of third-party libraries, implementation of our own algorithms for obtaining translations from translation systems (if it possible).
-
-7. **Poor error handling. But even so everything works (probably).**
+6. **~~Only Google Translate works.~~**
+7. **Only Google Translate works well.** Despite the fact that there are 2 other translation systems, it is highly recommended to use only Google. Others are a little slower and currently have trouble getting the text to fit correctly.
+8. **Poor error handling. But even so everything works (probably).**
 
 This is the first thing that came to mind. In addition to the above issues, there are others, for example, potentially poor use of PyQt5, perhaps not the most successful project architecture, lack of logging, etc. I will gradually correct the issues listed above and add new functionality. I will also try to add other OCR systems (for example, [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR)) or combinations of those already in use. Maybe I’ll train the model for recognition in EasyOCR for non-standard fonts

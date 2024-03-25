@@ -13,7 +13,8 @@ from PyQt5.QtGui import QPixmap, QPainter, QColor, QPalette, QBrush, QImage
 from src.ocr_systems import TesseractOCR, EasyOCR
 from src.subtitle_window import BackgroundSubtitleWindow, InpaintingSubtitleWindow
 from src.widgets import InterfaceSettingsWidget, MainSettingsWidget, FontStyleSettingsWidget
-from src.translators import GoogleTranslator, MicrosoftTranslator, DeeplTranslator, BaiduTranslator, YandexTranslator
+from src.translators.translators import GoogleTranslator, DeeplTranslator, YandexTranslator
+from src.translators.driver import WebDriverManager
 from config.config import *  # noqa: F403
 
 import pytesseract
@@ -145,12 +146,11 @@ class ScreenTranslatorApp(QMainWindow):
         }
         self.translators_dict = {
             "Google Translator": GoogleTranslator,
-            "Microsoft Translator": MicrosoftTranslator,
             "Deepl Translator": DeeplTranslator,
-            "Baidu Translator": BaiduTranslator,
             "Yandex Translator": YandexTranslator
         }
-        
+    
+        WebDriverManager()
         self.init_configuration()
         self.setWindowFlags(
             Qt.Window 
@@ -366,11 +366,11 @@ class ScreenTranslatorApp(QMainWindow):
     
 
     def set_translator(self, translator_name: str, target_language: str) -> None:
-        # So far only Google Translator.
-        # self.translator = self.translators_dict[translator_name](self.ocr_system_language)
         self.translator_target_language = target_language.lower()
-        self.translator_name = 'Google Translator'
-        self.translator = GoogleTranslator(source=self.ocr_system_language, target=target_language)
+        self.translator_name = translator_name
+        self.translator = self.translators_dict[translator_name](
+            self.ocr_system_language, self.translator_target_language 
+        )
         
 
     def toggle_interface_settings_window(self):

@@ -4,7 +4,6 @@ from PyQt5.QtWidgets import QLabel, QWidget
 from typing import Tuple
 from thefuzz import fuzz
 import numpy as np
-import re
 
 from src.window_capture import ScreenCapture
 
@@ -193,17 +192,6 @@ class BaseSubtitleWindow(QWidget):
         as empty, because one of the child classes does not need it.
         '''
         pass
-    
-    
-    def translate_list_of_texts(self, text_list: list) -> list:
-        pattern = r'\s*#\s*\$\s*#\s*'
-        unstrans_elem = '#$#' # #$# - untranslatable element
-        tmp_text = unstrans_elem.join(text_list)
-        if tmp_text:
-            tmp_text = self.translator.translate(tmp_text)
-        tmp_text = re.sub(pattern, unstrans_elem, str(tmp_text))
-        tmp_text = tmp_text.split(unstrans_elem)
-        return tmp_text
 
     
     def update_text(self, text_data: list) -> None:
@@ -214,7 +202,7 @@ class BaseSubtitleWindow(QWidget):
             if ratio >= 95 and self.cached_text and text:
                 return
             elif text:
-                translated_text = self.translate_list_of_texts(text_list)
+                translated_text = self.translator.translate_batch_concat(text_list)
                 text_data = [(text.strip(), *coords) for text, (_, *coords) in zip(translated_text, text_data)]
                 if text_data is None:
                     return 
